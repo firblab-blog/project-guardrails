@@ -1,0 +1,217 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive_ext: tar.gz
+            binary_name: project-guardrails
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            archive_ext: tar.gz
+            binary_name: project-guardrails
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            archive_ext: tar.gz
+            binary_name: project-guardrails
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive_ext: zip
+            binary_name: project-guardrails.exe
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Verify tag matches Cargo package version
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          if [ -z "$cargo_version" ]; then
+            echo "failed to read Cargo.toml version" >&2
+            exit 1
+          fi
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "tag version $tag_version does not match Cargo.toml version $cargo_version" >&2
+            exit 1
+          fi
+
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Validate crates.io package
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo package --locked
+
+      - name: Smoke test built binary
+        run: target/${{ matrix.target }}/release/${{ matrix.binary_name }} --version
+
+      - name: Compute asset name
+        id: asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          echo "name=project-guardrails-v${version}-${{ matrix.target }}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Unix release archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.binary_name }}"
+          tar -czf "${{ steps.asset.outputs.name }}.tar.gz" -C dist "${{ matrix.binary_name }}"
+
+      - name: Prepare Windows release archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.binary_name }}"
+          Compress-Archive -Path "dist/${{ matrix.binary_name }}" -DestinationPath "${{ steps.asset.outputs.name }}.zip" -Force
+
+      - name: Smoke test Unix release archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf smoke-test
+          mkdir -p smoke-test
+          tar -xzf "${{ steps.asset.outputs.name }}.tar.gz" -C smoke-test
+          "./smoke-test/${{ matrix.binary_name }}" --version
+
+      - name: Smoke test Windows release archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force smoke-test -ErrorAction SilentlyContinue
+          Expand-Archive -Path "${{ steps.asset.outputs.name }}.zip" -DestinationPath smoke-test -Force
+          & ".\\smoke-test\\${{ matrix.binary_name }}" --version
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ steps.asset.outputs.name }}.${{ matrix.archive_ext }}
+
+  publish-crate:
+    name: Publish crates.io package
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Confirm crates.io token is configured
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "CARGO_REGISTRY_TOKEN secret is required to publish project-guardrails to crates.io" >&2
+            exit 1
+          fi
+
+      - name: Publish crate
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked --token "$CARGO_REGISTRY_TOKEN"
+
+  publish-release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - build
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-artifacts
+          version="${GITHUB_REF_NAME#v}"
+          sha256sum \
+            project-guardrails-v${version}-x86_64-unknown-linux-gnu.tar.gz \
+            project-guardrails-v${version}-x86_64-apple-darwin.tar.gz \
+            project-guardrails-v${version}-aarch64-apple-darwin.tar.gz \
+            project-guardrails-v${version}-x86_64-pc-windows-msvc.zip \
+            > SHA256SUMS
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          tag="v${version}"
+          cat > RELEASE_NOTES.md <<EOF
+          ## Install
+
+          The recommended install path for ${tag} is the release archive for your platform from this page.
+
+          Download the archive for your platform from this release, download \`SHA256SUMS\`, verify the archive against \`SHA256SUMS\`, then extract the binary and place it on your \`PATH\`.
+
+          Supported release archives in this tag:
+
+          - \`project-guardrails-${tag}-x86_64-unknown-linux-gnu.tar.gz\`
+          - \`project-guardrails-${tag}-x86_64-apple-darwin.tar.gz\`
+          - \`project-guardrails-${tag}-aarch64-apple-darwin.tar.gz\`
+          - \`project-guardrails-${tag}-x86_64-pc-windows-msvc.zip\`
+          - \`SHA256SUMS\`
+
+          If \`project-guardrails\` is also available on \`crates.io\`, that remains an optional Cargo-based install path:
+
+          \`cargo install project-guardrails --locked --version ${version}\`
+
+          Installing from a local checkout remains the developer path when you want to inspect and build from the tagged source yourself.
+
+          ## Trust
+
+          This release publishes checksummed platform archives on GitHub.
+          Verify any archive download against \`SHA256SUMS\` before extracting or running it.
+
+          This release does not currently publish signed artifacts, Sigstore provenance, or package-manager attestations.
+          If you need stronger assurance, inspect the tagged source and build from source with Cargo.
+          EOF
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: release-artifacts/*

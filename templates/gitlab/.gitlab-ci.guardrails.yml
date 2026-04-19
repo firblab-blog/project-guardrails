@@ -1,0 +1,13 @@
+stages:
+  - guardrails
+
+guardrails:check:
+  stage: guardrails
+  # v0.1 provisioning contract:
+  # this generated job validates guardrails, but it does not install
+  # project-guardrails for you. Make sure the runner image or an earlier
+  # shared setup step puts project-guardrails on PATH before this job runs.
+  script:
+    - project-guardrails --version
+    - project-guardrails doctor --target .
+    - project-guardrails check --target .
