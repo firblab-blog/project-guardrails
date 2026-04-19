@@ -1,0 +1,46 @@
+name: guardrails
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_GUARDRAILS_VERSION: "0.1.0"
+  PROJECT_GUARDRAILS_REPO: "firblab-blog/project-guardrails"
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned project-guardrails release binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="x86_64-unknown-linux-gnu"
+          version="${PROJECT_GUARDRAILS_VERSION}"
+          repo="${PROJECT_GUARDRAILS_REPO}"
+          archive="project-guardrails-v${version}-${target}.tar.gz"
+          base_url="https://github.com/${repo}/releases/download/v${version}"
+
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSLO "${base_url}/${archive}"
+          curl -fsSLO "${base_url}/SHA256SUMS"
+          grep " ${archive}\$" SHA256SUMS > SHA256SUMS.current
+          sha256sum -c SHA256SUMS.current
+          tar -xzf "${archive}"
+          install -m 0755 project-guardrails "$HOME/.local/bin/project-guardrails"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify installed CLI
+        run: project-guardrails --version
+
+      - name: Validate guardrails contract with doctor
+        run: project-guardrails doctor --target .
+
+      - name: Enforce configured checks
+        run: project-guardrails check --target .

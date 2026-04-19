@@ -1,0 +1,30 @@
+version = 1
+profile = "minimal"
+profile_source = "built-in:minimal"
+profile_schema_version = 1
+config_version = 1
+installed_by_version = "0.1.0"
+
+[[managed_paths]]
+path = ".github/workflows/guardrails.yml"
+stale_action = "remove"
+
+[[managed_paths]]
+path = ".guardrails/guardrails.toml"
+stale_action = "review"
+
+[[managed_paths]]
+path = ".guardrails/profile.lock"
+stale_action = "review"
+
+[[managed_paths]]
+path = "AGENTS.md"
+stale_action = "review"
+
+[[managed_paths]]
+path = "docs/project/handoff-template.md"
+stale_action = "review"
+
+[[managed_paths]]
+path = "docs/project/implementation-tracker.md"
+stale_action = "review"
