@@ -1,0 +1,110 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+stages:
+  - guardrails
+  - quality
+  - security
+  - build
+  - release
+  - mirror
+
+default:
+  interruptible: true
+  # Bring your own runner image or shared setup step.
+  # This example assumes the image already has project-guardrails plus the
+  # toolchain your repository needs.
+  image: registry.example.com/your-group/ci/base:stable
+
+variables:
+  # Replace these with the remote names and URLs your repo actually uses.
+  GIT_STRATEGY: fetch
+  PUBLIC_MIRROR_REMOTE_NAME: public-mirror
+  PUBLIC_MIRROR_URL: https://github.com/firblab-blog/project-guardrails.git
+
+guardrails:check:
+  stage: guardrails
+  script:
+    - project-guardrails --version
+    - project-guardrails doctor --target .
+    - project-guardrails check --target .
+
+quality:repo:
+  stage: quality
+  needs:
+    - guardrails:check
+  script:
+    - echo "Replace with repo-specific quality checks."
+    - ./ci/quality.sh
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+security:repo:
+  stage: security
+  needs:
+    - guardrails:check
+  script:
+    - echo "Replace with repo-specific dependency, image, or SAST scanning."
+    - ./ci/security.sh
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+security:sonarqube:
+  stage: security
+  image: sonarsource/sonar-scanner-cli:latest
+  script:
+    - echo "Replace with your repo's SonarQube invocation and variables."
+    - sonar-scanner -Dsonar.host.url="$SONAR_HOST_URL" -Dsonar.token="$SONAR_TOKEN" -Dsonar.projectKey="${SONAR_PROJECT_KEY:-your-project-key}"
+  rules:
+    - if: '$SONAR_HOST_URL && $SONAR_TOKEN && $CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$SONAR_HOST_URL && $SONAR_TOKEN && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$SONAR_HOST_URL && $SONAR_TOKEN && $CI_COMMIT_TAG'
+
+build:artifact:
+  stage: build
+  needs:
+    - quality:repo
+    - security:repo
+  script:
+    - echo "Replace with the build or packaging command for your repo."
+    - ./ci/build.sh
+  artifacts:
+    expire_in: 7 days
+    paths:
+      - dist/
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+release:internal:
+  stage: release
+  needs:
+    - build:artifact
+  script:
+    - echo "Publish internal release outputs from GitLab."
+    - echo "This can create a GitLab release, upload packages, or push images."
+    - ./ci/release.sh
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+mirror:outbound:
+  stage: mirror
+  needs:
+    - release:internal
+  before_script:
+    - git remote remove "$PUBLIC_MIRROR_REMOTE_NAME" 2>/dev/null || true
+    - git remote add "$PUBLIC_MIRROR_REMOTE_NAME" "$PUBLIC_MIRROR_URL"
+  script:
+    - echo "Mirror only after GitLab remains the source-of-truth release home."
+    - echo "Replace with your own credential and ref-protection policy."
+    - ./ci/mirror.sh "$PUBLIC_MIRROR_REMOTE_NAME"
+  rules:
+    - if: '$CI_COMMIT_TAG'
