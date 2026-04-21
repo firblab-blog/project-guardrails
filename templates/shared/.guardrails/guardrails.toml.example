@@ -1,0 +1,40 @@
+version = 1
+profile = "minimal"
+profile_source = "built-in:minimal"
+profile_schema_version = 1
+installed_by_version = "0.1.0"
+
+[project]
+name = "example-project"
+root_markers = [".git"]
+
+[docs]
+enabled = true
+required = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/handoff-template.md",
+]
+
+[rules]
+required_files = [
+  "README.md",
+  "AGENTS.md",
+  ".guardrails/guardrails.toml",
+]
+forbidden_dirs = []
+
+[ci]
+provider = "github"
+workflow_path = ".github/workflows/guardrails.yml"
+
+[engines.semgrep]
+enabled = false
+binary = "semgrep"
+config_paths = []
+extra_args = []
+
+[engines.conftest]
+enabled = false
+binary = "conftest"
+policy_paths = []
+extra_args = []

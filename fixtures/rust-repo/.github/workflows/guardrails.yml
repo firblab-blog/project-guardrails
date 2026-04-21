@@ -1,0 +1,19 @@
+name: guardrails
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run doctor
+        run: cargo run -- doctor --target .
+      - name: Run local checks
+        run: cargo run -- check --target .

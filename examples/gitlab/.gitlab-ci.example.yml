@@ -1,0 +1,34 @@
+default:
+  image: debian:bookworm-slim
+  before_script:
+    - export PATH="$CI_PROJECT_DIR/.project-guardrails-root/bin:$PATH"
+
+variables:
+  PROJECT_GUARDRAILS_VERSION: "0.1.0"
+  PROJECT_GUARDRAILS_REPO: "firblab-blog/project-guardrails"
+
+include:
+  - local: .gitlab-ci.guardrails.yml
+
+guardrails:provision:
+  stage: .pre
+  script:
+    - apt-get update -qq
+    - apt-get install -yqq --no-install-recommends ca-certificates curl tar gzip grep coreutils
+    - export TARGET="x86_64-unknown-linux-gnu"
+    - export VERSION="$PROJECT_GUARDRAILS_VERSION"
+    - export REPO="$PROJECT_GUARDRAILS_REPO"
+    - export ARCHIVE="project-guardrails-v${VERSION}-${TARGET}.tar.gz"
+    - export BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
+    - mkdir -p "$CI_PROJECT_DIR/.project-guardrails-root/bin"
+    - curl -fsSLo "$ARCHIVE" "${BASE_URL}/${ARCHIVE}"
+    - curl -fsSLo SHA256SUMS "${BASE_URL}/SHA256SUMS"
+    - grep " ${ARCHIVE}\$" SHA256SUMS > SHA256SUMS.current
+    - sha256sum -c SHA256SUMS.current
+    - tar -xzf "$ARCHIVE"
+    - install -m 0755 project-guardrails "$CI_PROJECT_DIR/.project-guardrails-root/bin/project-guardrails"
+    - '"$CI_PROJECT_DIR/.project-guardrails-root/bin/project-guardrails" --version'
+  artifacts:
+    paths:
+      - .project-guardrails-root/
+    expire_in: 1 day
