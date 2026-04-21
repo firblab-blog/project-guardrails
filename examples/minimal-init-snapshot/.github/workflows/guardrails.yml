@@ -1,0 +1,21 @@
+name: guardrails
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  guardrails:
+    # v0.1 provisioning contract:
+    # this generated workflow validates guardrails, but it does not install
+    # project-guardrails for you. Make sure the runner image or an earlier
+    # shared setup step puts project-guardrails on PATH before this job runs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify project-guardrails is already available on the runner
+        run: project-guardrails --version
+      - name: Validate guardrails contract with doctor
+        run: project-guardrails doctor --target .
+      - name: Enforce configured checks
+        run: project-guardrails check --target .
