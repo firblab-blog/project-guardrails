@@ -1,0 +1,92 @@
+schema_version = 1
+name = "team-ops"
+description = "Language-agnostic profile that adds a release checklist and collaboration prompts."
+default_ci = "gitlab"
+root_markers = [".git"]
+docs_enabled = true
+required_docs = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/handoff-template.md",
+  "docs/project/release-checklist.md",
+]
+required_files = [
+  "README.md",
+  "AGENTS.md",
+  ".guardrails/guardrails.toml",
+  ".pre-commit-config.yaml",
+]
+forbidden_dirs = []
+includes_handoff = true
+
+[task_references]
+required = true
+
+[workflow_paths]
+github = ".github/workflows/guardrails.yml"
+gitlab = ".gitlab-ci.guardrails.yml"
+
+[[link_requirements]]
+changed_paths = ["src/"]
+required_docs = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/release-checklist.md",
+]
+message = "changes under src/ must update the tracker or release checklist in the same commit"
+
+[[forbidden_patterns]]
+pattern = "REMOVE_BEFORE_MERGE"
+message = "remove temporary placeholders before commit"
+
+[[starter_content]]
+path = "AGENTS.md"
+markers = [
+  "Describe the product or system this repository owns.",
+  "Keep the statement short enough that a new human or LLM collaborator can orient quickly.",
+  "keep the release checklist current as work lands",
+  "leave handoff notes that another contributor can continue without guesswork",
+]
+threshold = 2
+
+[[starter_content]]
+path = "docs/project/implementation-tracker.md"
+markers = [
+  "define the current narrow slice of work",
+  "replace this line with the next valid step",
+  "replace this with explicit non-goals that prevent drift",
+  "replace with assumptions validated by current work",
+  "replace with unresolved decisions that could change scope",
+]
+threshold = 2
+
+[[starter_content]]
+path = "docs/project/release-checklist.md"
+markers = [
+  "what is intentionally in this release",
+  "tests or checks that must pass",
+  "who still needs to review",
+]
+threshold = 2
+
+[[managed_blocks]]
+path = "AGENTS.md"
+id = "repo-context"
+generator = "repo_context_v1"
+placement = "after_first_heading"
+
+[[managed_blocks]]
+path = "docs/project/implementation-tracker.md"
+id = "task-sync"
+generator = "tracker_sync_v1"
+placement = "after_first_heading"
+
+[semgrep]
+enabled = false
+binary = "semgrep"
+config_paths = []
+extra_args = []
+
+[conftest]
+enabled = false
+binary = "conftest"
+policy_paths = []
+extra_args = []

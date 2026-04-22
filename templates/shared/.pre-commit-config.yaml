@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: project-guardrails-pre-commit
+        name: project-guardrails pre-commit
+        entry: project-guardrails pre-commit --target .
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: project-guardrails-commit-msg
+        name: project-guardrails commit-msg-check
+        entry: project-guardrails commit-msg-check --target .
+        language: system
+        pass_filenames: true
+        stages: [commit-msg]
