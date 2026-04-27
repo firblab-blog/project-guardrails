@@ -1,0 +1,247 @@
+schema_version = 1
+name = "guardrails"
+description = "Opt-in FirbLab-style doctrine profile with seeded AGENTS guidance, project docs, and curated best-practice references."
+default_ci = "github"
+root_markers = [".git"]
+docs_enabled = true
+required_docs = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/handoff-template.md",
+  "docs/project/decision-log.md",
+  "docs/project/implementation-invariants.md",
+  "docs/best-practices/change-safety.md",
+  "docs/best-practices/ci-and-enforcement.md",
+  "docs/best-practices/docs-and-handoffs.md",
+  "docs/best-practices/repo-shaping.md",
+]
+required_files = [
+  "README.md",
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".cursor/rules/project-guardrails.mdc",
+  ".guardrails/guardrails.toml",
+  ".pre-commit-config.yaml",
+]
+forbidden_dirs = []
+includes_handoff = true
+
+[task_references]
+required = true
+
+[rule_packs]
+default_enabled = [
+  "llm-common-mistakes",
+  "docs-freshness",
+  "secret-safety",
+]
+
+[[rule_packs.available]]
+name = "llm-common-mistakes"
+description = "Blocks common AI-assisted draft artifacts and debug leftovers before they land."
+severity = "error"
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)\b(as an ai|as a language model|i cannot browse|i can'?t access external websites)\b'''
+message = "llm-common-mistakes: remove AI boilerplate from repo files. Remediation: replace it with repo-specific implementation notes or user-facing copy."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)\bTODO\s*:?\s*(implement|wire|add|finish|fill in|replace|later)\b'''
+message = "llm-common-mistakes: do not commit unfinished placeholder TODOs. Remediation: finish the slice, link it to an active task, or document an explicit follow-up in docs/project/implementation-tracker.md."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)\b(REMOVE_BEFORE_(MERGE|COMMIT)|DO_NOT_COMMIT|TEMPORARY_DEBUG)\b'''
+message = "llm-common-mistakes: remove temporary commit blockers and debug markers. Remediation: delete the marker or move the unresolved work into the tracker before staging."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)\b(console\.log\s*\(|debugger\s*;)'''
+message = "llm-common-mistakes: remove browser debug statements before commit. Remediation: use the repo's logging or test diagnostics instead."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)\b(lorem ipsum|dummy implementation|placeholder implementation|stub implementation)\b'''
+message = "llm-common-mistakes: replace generated filler or stub wording before commit. Remediation: write the real implementation or stage a documented test-backed narrow slice."
+
+[[rule_packs.available]]
+name = "docs-freshness"
+description = "Requires project docs to move with code, test, profile, template, CI, and agent-context changes."
+severity = "error"
+
+[[rule_packs.available.link_requirements]]
+changed_paths = [
+  "src/",
+  "tests/",
+  "profiles/",
+  "templates/",
+  ".github/workflows/",
+  ".gitlab-ci.guardrails.yml",
+  ".pre-commit-config.yaml",
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".cursor/rules/",
+]
+required_docs = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/decision-log.md",
+  "docs/project/implementation-invariants.md",
+]
+message = "docs-freshness: code, test, profile, template, CI, or agent-context changes must stage docs/project/implementation-tracker.md, docs/project/decision-log.md, or docs/project/implementation-invariants.md in the same commit. Remediation: update the relevant repo-local doc, or narrow the staged change."
+
+[[rule_packs.available.evidence_requirements]]
+name = "source-change-context"
+changed_paths = [
+  "src/",
+  "crates/",
+  "packages/",
+  "apps/",
+]
+evidence_paths = [
+  "docs/project/implementation-tracker.md",
+  ".guardrails/state/tasks/",
+]
+message = "docs-freshness: source changes must stage implementation-tracker or task evidence in the same commit. Remediation: update the tracker or active task notes with the source-change context."
+
+[[rule_packs.available.evidence_requirements]]
+name = "public-api-decision"
+changed_paths = [
+  "src/lib.rs",
+  "src/api/",
+  "src/commands/",
+  "src/config.rs",
+  "src/profile.rs",
+]
+evidence_paths = [
+  "docs/project/decision-log.md",
+]
+message = "docs-freshness: public API or command/config surface changes must stage decision-log evidence. Remediation: record the decision or compatibility note in docs/project/decision-log.md."
+
+[[rule_packs.available.evidence_requirements]]
+name = "dependency-rationale"
+changed_paths = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "go.mod",
+  "go.sum",
+  "requirements.txt",
+  "pyproject.toml",
+  "uv.lock",
+  "Pipfile.lock",
+  "Gemfile",
+  "Gemfile.lock",
+]
+evidence_paths = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/decision-log.md",
+  ".guardrails/state/tasks/",
+]
+evidence_patterns = ['''(?i)\b(rationale|because|reason|why|dependency|deps|upgrade|pin|security)\b''']
+message = "docs-freshness: dependency manifest changes must stage rationale evidence in task notes or project docs. Remediation: add a short rationale explaining why the dependency changed."
+
+[[rule_packs.available.evidence_requirements]]
+name = "infra-validation"
+changed_paths = [
+  ".github/workflows/",
+  ".gitlab-ci.guardrails.yml",
+  "Dockerfile",
+  "docker-compose.yml",
+  "compose.yml",
+  "infra/",
+  "terraform/",
+  "k8s/",
+  "helm/",
+]
+evidence_paths = [
+  "docs/project/implementation-tracker.md",
+  "docs/project/decision-log.md",
+  ".guardrails/state/tasks/",
+]
+evidence_patterns = ['''(?i)\b(rollback|backout|revert plan|validat(e|ed|ion)|verif(y|ied|ication))\b''']
+message = "docs-freshness: infra changes must stage rollback or validation evidence in task notes or project docs. Remediation: record the validation performed or rollback/backout note."
+
+[[rule_packs.available.evidence_requirements]]
+name = "deleted-test-evidence"
+deleted_paths = [
+  "tests/",
+]
+evidence_paths = [
+  "docs/project/implementation-tracker.md",
+  ".guardrails/state/tasks/",
+]
+evidence_patterns = ['''(?i)\b(delet(e|ed|ing)|remov(e|ed|ing) test|replacement test|coverage|obsolete|superseded)\b''']
+replacement_paths = [
+  "tests/",
+]
+message = "docs-freshness: deleted tests must stage replacement tests or task/tracker evidence explaining the removal. Remediation: add the replacement test, or document why the test is obsolete."
+
+[[rule_packs.available]]
+name = "secret-safety"
+description = "Blocks obvious credential material in added staged lines."
+severity = "error"
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''AKIA[0-9A-Z]{16}'''
+message = "secret-safety: possible AWS access key detected. Remediation: remove the key, rotate it if real, and use repo-approved secret storage."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----'''
+message = "secret-safety: private key material must not be committed. Remediation: remove the key, rotate it if exposed, and document only the secret reference path."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''gh[pousr]_[A-Za-z0-9_]{20,}'''
+message = "secret-safety: possible GitHub token detected. Remediation: remove the token, revoke it if real, and use repo-approved secret storage."
+
+[[rule_packs.available.forbidden_patterns]]
+pattern = '''(?i)\b(password|passwd|api[_-]?key|secret|token)\s*[:=]\s*['"][^'"\s]{8,}['"]'''
+message = "secret-safety: likely inline secret assignment detected. Remediation: replace it with an environment variable, fixture placeholder, or documented secret reference."
+
+[workflow_paths]
+github = ".github/workflows/guardrails.yml"
+gitlab = ".gitlab-ci.guardrails.yml"
+
+[[managed_blocks]]
+path = "AGENTS.md"
+id = "repo-context"
+generator = "repo_context_v1"
+placement = "after_first_heading"
+
+[[managed_blocks]]
+path = "docs/project/implementation-tracker.md"
+id = "task-sync"
+generator = "tracker_sync_v1"
+placement = "after_first_heading"
+
+[[adapter_targets]]
+path = "CLAUDE.md"
+kind = "claude"
+name = "Claude Code"
+
+[[managed_blocks]]
+path = "CLAUDE.md"
+id = "adapter-context"
+generator = "repo_context_v1"
+placement = "after_first_heading"
+
+[[adapter_targets]]
+path = ".cursor/rules/project-guardrails.mdc"
+kind = "cursor"
+name = "Cursor"
+
+[[managed_blocks]]
+path = ".cursor/rules/project-guardrails.mdc"
+id = "adapter-context"
+generator = "repo_context_v1"
+placement = "after_first_heading"
+
+[semgrep]
+enabled = false
+binary = "semgrep"
+config_paths = []
+extra_args = []
+
+[conftest]
+enabled = false
+binary = "conftest"
+policy_paths = []
+extra_args = []

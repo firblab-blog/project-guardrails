@@ -1,0 +1,21 @@
+/target
+.DS_Store
+
+# Private/source-side planning artifacts. These are useful in the GitLab source
+# repo but should not be accidentally added to the public GitHub mirror surface.
+docs/ai-workflow-continuity-*.md
+docs/*implementation-plan*.md
+docs/*worker-prompts*.md
+docs/codex-work-prompts*.md
+docs/*readiness-checklist*.md
+docs/*live-proof-checklist*.md
+docs/*feature-completeness-plan*.md
+docs/*analysis-*.md
+docs/*re-review-*.md
+docs/*roadmap-*.md
+
+# Repo-local self-adoption artifacts. These prove the bootstrap flow in the
+# private/source checkout, but should not be committed to the public mirror.
+.guardrails/
+.pre-commit-config.yaml
+docs/project/

@@ -1,0 +1,27 @@
+class ProjectGuardrails < Formula
+  desc "Portable repo-local guardrails bootstrap utility"
+  homepage "https://github.com/firblab-blog/project-guardrails"
+  version "0.2.0"
+  license "MIT OR Apache-2.0"
+
+  if OS.mac?
+    if Hardware::CPU.arm?
+      url "https://github.com/firblab-blog/project-guardrails/releases/download/v0.2.0/project-guardrails-v0.2.0-aarch64-apple-darwin.tar.gz"
+      sha256 "REPLACE_WITH_V0_2_0_MACOS_ARM64_SHA256"
+    else
+      url "https://github.com/firblab-blog/project-guardrails/releases/download/v0.2.0/project-guardrails-v0.2.0-x86_64-apple-darwin.tar.gz"
+      sha256 "REPLACE_WITH_V0_2_0_MACOS_X86_64_SHA256"
+    end
+  else
+      url "https://github.com/firblab-blog/project-guardrails/releases/download/v0.2.0/project-guardrails-v0.2.0-x86_64-unknown-linux-gnu.tar.gz"
+    sha256 "REPLACE_WITH_V0_2_0_LINUX_X86_64_SHA256"
+  end
+
+  def install
+    bin.install "project-guardrails"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/project-guardrails --version")
+  end
+end
